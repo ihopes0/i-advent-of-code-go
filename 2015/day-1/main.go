@@ -7,8 +7,24 @@ import (
 	"strings"
 )
 
+func main() {
+	// see below or input.md
+	ansOne, err := resolveProblemPartOne(dayOneInput)
+
+	if err != nil {
+		log.Fatalf("Error in your code. Err: %s", err)
+	}
+
+	ansTwo, err := resolveProblemPartTwo(dayOneInput)
+
+	fmt.Println("Answer for Part 1: ", ansOne)
+	fmt.Println("Answer for Part 2: ", ansTwo)
+}
+
 // https://adventofcode.com/2015/day/1
 // -- Day 1: Not Quite Lisp ---
+
+// -- Part 1 --
 
 // Santa was hoping for a white Christmas, but his weather machine's "snow" function is powered by stars, and he's fresh out!
 // To save Christmas, he needs you to collect fifty stars by December 25th.
@@ -32,18 +48,7 @@ import (
 
 // To what floor do the instructions take Santa?
 
-func main() {
-	// see below or input.md
-	ans, err := resolveProblem(dayOneInput)
-
-	if err != nil {
-		log.Fatalf("Error in your code. Err: %s", err)
-	}
-
-	fmt.Println("Answer: ", ans)
-}
-
-func resolveProblem(input string) (ans int, err error) {
+func resolveProblemPartOne(input string) (ans int, err error) {
 	b := make([]byte, 1)
 	r := strings.NewReader(input)
 
@@ -59,8 +64,51 @@ func resolveProblem(input string) (ans int, err error) {
 		case ')':
 			ans -= 1
 		default:
-			err = fmt.Errorf("Unrecognizer character in input: %q", b[0])
+			err = fmt.Errorf("Unrecognized character in input: %q", b[0])
 			return 0, err
+		}
+	}
+
+	return ans, nil
+}
+
+// -- Part 2 --
+// Now, given the same instructions, find the position of the first character that causes him to enter
+// the basement (floor -1). The first character in the instructions has position 1, the second character
+// has position 2, and so on.
+
+// For example:
+
+//     ) causes him to enter the basement at character position 1.
+//     ()()) causes him to enter the basement at character position 5.
+
+// What is the position of the character that causes Santa to first enter the basement?
+
+func resolveProblemPartTwo(input string) (ans int, err error) {
+	b := make([]byte, 1)
+	r := strings.NewReader(input)
+	floor := 0
+
+	for {
+		_, err := r.Read(b)
+		if err == io.EOF {
+			break
+		}
+
+		switch b[0] {
+		case '(':
+			floor += 1
+		case ')':
+			floor -= 1
+		default:
+			err = fmt.Errorf("Unrecognized character in input: %q", b[0])
+			return 0, err
+		}
+
+		ans += 1
+
+		if floor == -1 {
+			break
 		}
 	}
 
