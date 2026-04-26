@@ -35,11 +35,13 @@ func main() {
 	// fmt.Println("Starting solving problem part 1 with input: ", inputOne)
 
 	ansOne, err := resolveProblemPartOne(inputOne)
+	ansOneOnTheFly, err := resolveProblemPartOneOnTheFly()
 	if err != nil {
 		log.Fatalf("Err during part one: %s", err)
 	}
 
-	fmt.Printf("Answer1: %d\n", ansOne)
+	fmt.Printf("Answer1      : %d\n", ansOne)
+	fmt.Printf("Answer1 [OTF]: %d\n", ansOneOnTheFly)
 }
 
 func getInput() (input [][3]int64, err error) {
@@ -52,11 +54,10 @@ func getInput() (input [][3]int64, err error) {
 	scanner := bufio.NewScanner(file)
 	row := 0
 	for scanner.Scan() {
-		fmt.Println(scanner.Text())
 		var r [3]int64
 		input = append(input, r)
 		for i, num := range strings.Split(scanner.Text(), "x") {
-			fmt.Println(i, " - ", num)
+			// fmt.Println(i, " - ", num)
 			input[row][i], err = strconv.ParseInt(num, 0, 64)
 			if err != nil {
 				return nil, err
@@ -71,6 +72,33 @@ func getInput() (input [][3]int64, err error) {
 func resolveProblemPartOne(input [][3]int64) (ans int64, err error) {
 	for _, row := range input {
 		res, err := getTotalSpace(row[0], row[1], row[2])
+		if err != nil {
+			return 0, err
+		}
+		ans += res
+	}
+
+	return ans, nil
+}
+
+func resolveProblemPartOneOnTheFly() (ans int64, err error) {
+	file, err := os.Open("input.txt")
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		dims := make([]int64, 3)
+		for i, num := range strings.Split(scanner.Text(), "x") {
+			// fmt.Println(i, " - ", num)
+			dims[i], err = strconv.ParseInt(num, 0, 64)
+			if err != nil {
+				return 0, err
+			}
+		}
+		res, err := getTotalSpace(dims[0], dims[1], dims[2])
 		if err != nil {
 			return 0, err
 		}
