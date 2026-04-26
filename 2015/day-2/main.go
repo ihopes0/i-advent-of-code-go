@@ -8,6 +8,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
 
 // https://adventofcode.com/2015/day/2
@@ -27,21 +29,30 @@ import (
 // All numbers in the elves' list are in feet. How many total square feet of wrapping paper should they order?
 
 func main() {
+	start := time.Now()
 	inputOne, err := getInput()
 	if err != nil {
 		log.Fatalf("Cannot parse input.md. Err: %s", err)
 	}
-
-	// fmt.Println("Starting solving problem part 1 with input: ", inputOne)
-
 	ansOne, err := resolveProblemPartOne(inputOne)
-	ansOneOnTheFly, err := resolveProblemPartOneOnTheFly()
 	if err != nil {
 		log.Fatalf("Err during part one: %s", err)
 	}
+	fmt.Printf("Answer1      : %d | took: %v\n", ansOne, time.Since(start))
 
-	fmt.Printf("Answer1      : %d\n", ansOne)
-	fmt.Printf("Answer1 [OTF]: %d\n", ansOneOnTheFly)
+	start = time.Now()
+	ansOneOnTheFly, err := resolveProblemPartOneOnTheFly()
+	if err != nil {
+		log.Fatalf("Err during part one otf: %s", err)
+	}
+	fmt.Printf("Answer1 [OTF]: %d | took: %v\n", ansOneOnTheFly, time.Since(start))
+
+	start = time.Now()
+	ansConc, err := resolveProblemPartOneConcurrent()
+	if err != nil {
+		log.Fatalf("Err during part one concurrent: %s", err)
+	}
+	fmt.Printf("Answer1 [CON]: %d | took: %v\n", ansConc, time.Since(start))
 }
 
 func getInput() (input [][3]int64, err error) {
@@ -54,15 +65,11 @@ func getInput() (input [][3]int64, err error) {
 	scanner := bufio.NewScanner(file)
 	row := 0
 	for scanner.Scan() {
-		var r [3]int64
-		input = append(input, r)
-		for i, num := range strings.Split(scanner.Text(), "x") {
-			// fmt.Println(i, " - ", num)
-			input[row][i], err = strconv.ParseInt(num, 0, 64)
-			if err != nil {
-				return nil, err
-			}
+		dims, err := parseDimensions(scanner.Text())
+		if err != nil {
+			return input, err
 		}
+		input = append(input, dims)
 		row += 1
 	}
 
@@ -81,31 +88,108 @@ func resolveProblemPartOne(input [][3]int64) (ans int64, err error) {
 	return ans, nil
 }
 
-func resolveProblemPartOneOnTheFly() (ans int64, err error) {
+func resolveProblemPartOneOnTheFly() (int64, error) {
 	file, err := os.Open("input.txt")
 	if err != nil {
 		return 0, err
 	}
 	defer file.Close()
 
+	var ans int64
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
-		dims := make([]int64, 3)
-		for i, num := range strings.Split(scanner.Text(), "x") {
-			// fmt.Println(i, " - ", num)
-			dims[i], err = strconv.ParseInt(num, 0, 64)
-			if err != nil {
-				return 0, err
-			}
+		dims, err := parseDimensions(scanner.Text())
+		if err != nil {
+			return 0, err
 		}
+
 		res, err := getTotalSpace(dims[0], dims[1], dims[2])
 		if err != nil {
 			return 0, err
 		}
+
 		ans += res
 	}
 
 	return ans, nil
+}
+
+func resolveProblemPartOneConcurrent() (int64, error) {
+	file, err := os.Open("input.txt")
+	if err != nil {
+		return 0, err
+	}
+	defer file.Close()
+
+	const workers = 4
+
+	jobs := make(chan string)
+	results := make(chan int64)
+	errChan := make(chan error, 1)
+
+	var wg sync.WaitGroup
+
+	// Workers
+	for range workers {
+		wg.Go(func() {
+
+			for row := range jobs {
+				dims, err := parseDimensions(row)
+				if err != nil {
+					errChan <- err
+					return
+				}
+
+				res, err := getTotalSpace(dims[0], dims[1], dims[2])
+				if err != nil {
+					errChan <- err
+					return
+				}
+
+				results <- res
+			}
+		})
+	}
+
+	// Reader
+	go func() {
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			jobs <- scanner.Text()
+		}
+		close(jobs)
+	}()
+
+	// Close results ONLY after workers finish
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// Collect
+	var ans int64
+	for res := range results {
+		ans += res
+	}
+
+	select {
+	case err := <-errChan:
+		return 0, err
+	default:
+	}
+
+	return ans, nil
+}
+
+func parseDimensions(row string) (dims [3]int64, err error) {
+	for i, num := range strings.Split(row, "x") {
+		// fmt.Println(i, " - ", num)
+		dims[i], err = strconv.ParseInt(num, 0, 64)
+		if err != nil {
+			return dims, err
+		}
+	}
+	return dims, nil
 }
 
 func getTotalSpace(l, w, h int64) (int64, error) {
